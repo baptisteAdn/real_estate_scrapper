@@ -2,6 +2,10 @@ from selenium import webdriver
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen as uReq
 from datetime import date
+import yagmail
+import csv
+
+#Get date and time
 today = date.today()
 today = today.strftime('%d_%m_%Y')
 import pandas as pd
@@ -17,15 +21,9 @@ bedrooms = []
 bathrooms = []
 links = []
 
-#Setup my csv file
-file_name = today+"_remax.csv"
-f = open(file_name, 'w')
-
-headers = 'Date, ULS, Address, Price, Bedrooms, Bathrooms, Link\n'
-f.write(headers)
-
 #Access the website
-url_remax = 'https://www.remax-quebec.com/fr/maison-a-vendre/montreal/resultats.rmx'
+# url_remax = 'https://www.remax-quebec.com/fr/maison-a-vendre/montreal/resultats.rmx'
+url_remax = 'https://www.remax-quebec.com/fr/triplex/montreal/resultats.rmx'
 url_remax_root = 'https://www.remax-quebec.com'
 # driver.get(url_remax)
 # test=driver.find_element_by_xpath('/html/body/div[2]/div[4]/div/div/div/div[1]/a[2]/div[2]/h2').text()
@@ -86,10 +84,47 @@ for container in containers:
     link = url_remax_root+link
     links.append(link)
 
-    f.write(today + ',' + uls + ',' + address_uni.replace(',',' ') + ',' + price + ',' + bedroom + ',' + bathroom + ',' + link+'\n')
+#Clear the price list in order to remove the unicode so we can compare it to criteria
+prices_cleared = []
+for price in prices:
+    prices_cleared.append(price.replace(u'\xa0',u''))
 
-f.close()
+#Get the index of the appartement that meet the criteria
+criteria = 850000
+indexes = []
+for index, price in enumerate(prices_cleared):
+    if float(price) <= criteria:
+        indexes.append(index)
 
+#Get email info from csv files
+sender_info=[]
 
+with open('sender.csv', newline='') as csv_file:
+    csv_sender = csv.reader(csv_file, delimiter=',')
+    for row in csv_sender:
+        sender_info.append(row)
+
+email_sender = sender_info[0][0]
+pw_sender = sender_info[0][1]
+
+receiver_info=[]
+with open('receiver.csv', newline='') as csv_file:
+    csv_receiver = csv.reader(csv_file, delimiter=',')
+    for row in csv_receiver:
+        receiver_info.append(row)
+
+line_email =[]
+#Send email
+if not indexes:
+    print('list is empty')
+else:
+    #Create the message body
+    for index in indexes:
+        line ='Date: ' + today + ' ULS: '+uls_nb[index] + ' Adress: ' + address[index] + ' Price: ' + prices_cleared[index] +'$ url: ' + links[index]
+        line_email.append(line)
+
+    subject = today + ' - Remax scrap'
+    yag = yagmail.SMTP(email_sender, pw_sender)
+    yag.send(to=receiver_info[0], subject=subject, contents=line_email)
 
 
